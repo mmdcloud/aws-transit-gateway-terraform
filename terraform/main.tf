@@ -284,7 +284,7 @@ resource "aws_instance" "instance1" {
   key_name                    = data.aws_key_pair.key_pair.key_name
   subnet_id                   = aws_subnet.vpc1_subnets[0].id
   security_groups             = [aws_security_group.vpc1_sg.id]
-  user_data                   = "${file("user_data.sh")}"
+  user_data                   = filebase64("${path.module}/../user_data.sh")
   tags = {
     Name = "instance1"
   }
@@ -298,7 +298,7 @@ resource "aws_instance" "instance2" {
   key_name                    = data.aws_key_pair.key_pair.key_name
   subnet_id                   = aws_subnet.vpc2_subnets[0].id
   security_groups             = [aws_security_group.vpc2_sg.id]
-  user_data                   = "${file("user_data.sh")}"
+  user_data                   = filebase64("${path.module}/../user_data.sh")
   tags = {
     Name = "instance2"
   }
@@ -312,7 +312,7 @@ resource "aws_instance" "instance3" {
   key_name                    = data.aws_key_pair.key_pair.key_name
   subnet_id                   = aws_subnet.vpc3_subnets[0].id
   security_groups             = [aws_security_group.vpc3_sg.id]
-  user_data                   = "${file("user_data.sh")}"
+  user_data                   = filebase64("${path.module}/../user_data.sh")
   tags = {
     Name = "instance3"
   }
