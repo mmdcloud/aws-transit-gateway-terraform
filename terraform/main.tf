@@ -283,10 +283,10 @@ resource "aws_instance" "instance1" {
   availability_zone           = var.azs[0].arn
   key_name                    = data.aws_key_pair.key_pair.key_name
   subnet_id                   = aws_subnet.subnets[0].id
-  security_groups             = [aws_security_group.vpc_sg.id]
+  security_groups             = [aws_security_group.vpc1_sg.id]
   user_data                   = var.user_data
   tags = {
-    Name = "${var.region_name}_instance"
+    Name = "instance1"
   }
 }
 
@@ -297,10 +297,10 @@ resource "aws_instance" "instance2" {
   availability_zone           = var.azs[0].arn
   key_name                    = data.aws_key_pair.key_pair.key_name
   subnet_id                   = aws_subnet.subnets[0].id
-  security_groups             = [aws_security_group.vpc_sg.id]
+  security_groups             = [aws_security_group.vpc2_sg.id]
   user_data                   = var.user_data
   tags = {
-    Name = "${var.region_name}_instance"
+    Name = "instance2"
   }
 }
 
@@ -311,9 +311,9 @@ resource "aws_instance" "instance3" {
   availability_zone           = var.azs[0].arn
   key_name                    = data.aws_key_pair.key_pair.key_name
   subnet_id                   = aws_subnet.subnets[0].id
-  security_groups             = [aws_security_group.vpc_sg.id]
+  security_groups             = [aws_security_group.vpc3_sg.id]
   user_data                   = var.user_data
   tags = {
-    Name = "${var.region_name}_instance"
+    Name = "instance3"
   }
 }
