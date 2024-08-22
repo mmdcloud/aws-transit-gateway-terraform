@@ -280,11 +280,11 @@ resource "aws_instance" "instance1" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   associate_public_ip_address = true
-  availability_zone           = var.azs[0].arn
+  #availability_zone           = var.azs[0].id
   key_name                    = data.aws_key_pair.key_pair.key_name
-  subnet_id                   = aws_subnet.subnets[0].id
+  subnet_id                   = aws_subnet.vpc1_subnets[0].id
   security_groups             = [aws_security_group.vpc1_sg.id]
-  user_data                   = var.user_data
+  user_data                   = "${file("user_data.sh")}"
   tags = {
     Name = "instance1"
   }
@@ -294,11 +294,11 @@ resource "aws_instance" "instance2" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   associate_public_ip_address = true
-  availability_zone           = var.azs[0].arn
+  #availability_zone           = var.azs[0].id
   key_name                    = data.aws_key_pair.key_pair.key_name
-  subnet_id                   = aws_subnet.subnets[0].id
+  subnet_id                   = aws_subnet.vpc2_subnets[0].id
   security_groups             = [aws_security_group.vpc2_sg.id]
-  user_data                   = var.user_data
+  user_data                   = "${file("user_data.sh")}"
   tags = {
     Name = "instance2"
   }
@@ -308,11 +308,11 @@ resource "aws_instance" "instance3" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   associate_public_ip_address = true
-  availability_zone           = var.azs[0].arn
+  #availability_zone           = var.azs[0].id
   key_name                    = data.aws_key_pair.key_pair.key_name
-  subnet_id                   = aws_subnet.subnets[0].id
+  subnet_id                   = aws_subnet.vpc3_subnets[0].id
   security_groups             = [aws_security_group.vpc3_sg.id]
-  user_data                   = var.user_data
+  user_data                   = "${file("user_data.sh")}"
   tags = {
     Name = "instance3"
   }
