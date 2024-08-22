@@ -26,3 +26,12 @@ variable "azs" {
   description = "Availability Zones"
   default     = ["us-east-1a", "us-east-1b", "us-east-1c"]
 }
+
+variable "user_data" {
+  type    = string
+  default = <<EOF
+    #!/bin/bash
+    sudo apt-get update
+    sudo apt-get install -y nginx
+  EOF
+}
