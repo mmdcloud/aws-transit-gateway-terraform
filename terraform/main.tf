@@ -281,10 +281,10 @@ resource "aws_instance" "instance1" {
   instance_type               = "t2.micro"
   associate_public_ip_address = true
   #availability_zone           = var.azs[0].id
-  key_name                    = data.aws_key_pair.key_pair.key_name
-  subnet_id                   = aws_subnet.vpc1_subnets[0].id
-  security_groups             = [aws_security_group.vpc1_sg.id]
-  user_data                   = filebase64("${path.module}/../user_data.sh")
+  key_name        = data.aws_key_pair.key_pair.key_name
+  subnet_id       = aws_subnet.vpc1_subnets[0].id
+  security_groups = [aws_security_group.vpc1_sg.id]
+  user_data       = filebase64("${path.module}/user_data.sh")
   tags = {
     Name = "instance1"
   }
@@ -295,10 +295,10 @@ resource "aws_instance" "instance2" {
   instance_type               = "t2.micro"
   associate_public_ip_address = true
   #availability_zone           = var.azs[0].id
-  key_name                    = data.aws_key_pair.key_pair.key_name
-  subnet_id                   = aws_subnet.vpc2_subnets[0].id
-  security_groups             = [aws_security_group.vpc2_sg.id]
-  user_data                   = filebase64("${path.module}/../user_data.sh")
+  key_name        = data.aws_key_pair.key_pair.key_name
+  subnet_id       = aws_subnet.vpc2_subnets[0].id
+  security_groups = [aws_security_group.vpc2_sg.id]
+  user_data       = filebase64("${path.module}/user_data.sh")
   tags = {
     Name = "instance2"
   }
@@ -309,10 +309,10 @@ resource "aws_instance" "instance3" {
   instance_type               = "t2.micro"
   associate_public_ip_address = true
   #availability_zone           = var.azs[0].id
-  key_name                    = data.aws_key_pair.key_pair.key_name
-  subnet_id                   = aws_subnet.vpc3_subnets[0].id
-  security_groups             = [aws_security_group.vpc3_sg.id]
-  user_data                   = filebase64("${path.module}/../user_data.sh")
+  key_name        = data.aws_key_pair.key_pair.key_name
+  subnet_id       = aws_subnet.vpc3_subnets[0].id
+  security_groups = [aws_security_group.vpc3_sg.id]
+  user_data       = filebase64("${path.module}/user_data.sh")
   tags = {
     Name = "instance3"
   }
