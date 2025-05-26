@@ -273,7 +273,7 @@ data "aws_ami" "ubuntu" {
 }
 
 data "aws_key_pair" "key_pair" {
-  key_name = "surajm"
+  key_name = "madmaxkeypair"
 }
 
 resource "aws_instance" "instance1" {
