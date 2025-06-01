@@ -1,259 +1,305 @@
-# VPC1
-resource "aws_vpc" "vpc1" {
-  cidr_block = "10.1.0.0/24"
-  tags = {
-    Name = "vpc1"
-  }
+# VPC Configuration
+module "vpc1" {
+  source                = "./modules/vpc/vpc"
+  vpc_name              = "vpc1"
+  vpc_cidr_block        = "10.1.0.0/24"
+  enable_dns_hostnames  = true
+  enable_dns_support    = true
+  internet_gateway_name = "vpc1_igw"
 }
 
-resource "aws_subnet" "vpc1_subnets" {
-  count             = length(var.vpc1_subnets)
-  vpc_id            = aws_vpc.vpc1.id
-  cidr_block        = element(var.vpc1_subnets, count.index)
-  availability_zone = element(var.azs, count.index)
-  tags = {
-    Name = "vpc1_subnet ${count.index + 1}"
-  }
+# Public Subnets
+module "vpc1_subnets" {
+  source = "./modules/vpc/subnets"
+  name   = "vpc1 public subnet"
+  subnets = [
+    {
+      subnet = "10.1.0.0/28"
+      az     = "us-east-1a"
+    },
+    {
+      subnet = "10.1.0.16/28"
+      az     = "us-east-1b"
+    },
+    {
+      subnet = "10.1.0.96/28"
+      az     = "us-east-1c"
+    }
+  ]
+  vpc_id                  = module.vpc1.vpc_id
+  map_public_ip_on_launch = true
 }
 
-resource "aws_internet_gateway" "vpc1_igw" {
-  vpc_id = aws_vpc.vpc1.id
-  tags = {
-    Name = "vpc1_igw"
-  }
+# Carshub Public Route Table
+module "vpc1_rt" {
+  source  = "./modules/vpc/route_tables"
+  name    = "vpc1 route table"
+  subnets = module.vpc1_subnets.subnets[*]
+  routes = [
+    {
+      cidr_block         = "0.0.0.0/0"
+      gateway_id         = module.vpc1.igw_id
+      nat_gateway_id     = ""
+      transit_gateway_id = ""
+    },
+    {
+      cidr_block         = "10.2.0.0/24"
+      transit_gateway_id = module.transit_gateway.transit_gateway_id
+      gateway_id         = ""
+      nat_gateway_id     = ""
+    },
+    {
+      cidr_block         = "10.3.0.0/24"
+      transit_gateway_id = module.transit_gateway.transit_gateway_id
+      gateway_id         = ""
+      nat_gateway_id     = ""
+    }
+  ]
+  vpc_id = module.vpc1.vpc_id
 }
 
-resource "aws_route_table" "vpc1_route_table" {
-  vpc_id = aws_vpc.vpc1.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.vpc1_igw.id
-  }
-  route {
-    cidr_block         = "10.2.0.0/24"
-    transit_gateway_id = aws_ec2_transit_gateway.transit_gateway.id
-  }
-  route {
-    cidr_block         = "10.3.0.0/24"
-    transit_gateway_id = aws_ec2_transit_gateway.transit_gateway.id
-  }
-  tags = {
-    Name = "vpc1_route_table"
-  }
+# Security Group
+module "vpc1_sg" {
+  source = "./modules/vpc/security_groups"
+  vpc_id = module.vpc1.vpc_id
+  name   = "vpc1-sg"
+  ingress = [
+    {
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      self            = "false"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+      description     = "any"
+    },
+    {
+      from_port       = 22
+      to_port         = 22
+      protocol        = "tcp"
+      self            = "false"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+      description     = "any"
+    }
+  ]
+  egress = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
 }
 
-resource "aws_route_table_association" "vpc1_route_table_association" {
-  count          = length(var.vpc1_subnets)
-  subnet_id      = element(aws_subnet.vpc1_subnets[*].id, count.index)
-  route_table_id = aws_route_table.vpc1_route_table.id
+module "vpc2" {
+  source                = "./modules/vpc/vpc"
+  vpc_name              = "vpc2"
+  vpc_cidr_block        = "10.2.0.0/24"
+  enable_dns_hostnames  = true
+  enable_dns_support    = true
+  internet_gateway_name = "vpc2_igw"
 }
 
-# VPC2
-resource "aws_vpc" "vpc2" {
-  cidr_block = "10.2.0.0/24"
-  tags = {
-    Name = "vpc2"
-  }
+# Public Subnets
+module "vpc2_subnets" {
+  source = "./modules/vpc/subnets"
+  name   = "vpc2 subnet"
+  subnets = [
+    {
+      subnet = "10.2.0.0/28"
+      az     = "us-east-1a"
+    },
+    {
+      subnet = "10.2.0.16/28"
+      az     = "us-east-1b"
+    },
+    {
+      subnet = "10.2.0.96/28"
+      az     = "us-east-1c"
+    }
+  ]
+  vpc_id                  = module.vpc2.vpc_id
+  map_public_ip_on_launch = true
 }
 
-resource "aws_subnet" "vpc2_subnets" {
-  count             = length(var.vpc2_subnets)
-  vpc_id            = aws_vpc.vpc2.id
-  cidr_block        = element(var.vpc2_subnets, count.index)
-  availability_zone = element(var.azs, count.index)
-  tags = {
-    Name = "vpc2_subnet ${count.index + 1}"
-  }
+# Carshub Public Route Table
+module "vpc2_rt" {
+  source  = "./modules/vpc/route_tables"
+  name    = "vpc2 route table"
+  subnets = module.vpc2_subnets.subnets[*]
+  routes = [
+    {
+      cidr_block         = "0.0.0.0/0"
+      gateway_id         = module.vpc2.igw_id
+      nat_gateway_id     = ""
+      transit_gateway_id = ""
+    },
+    {
+      cidr_block         = "10.1.0.0/24"
+      transit_gateway_id = module.transit_gateway.transit_gateway_id
+      gateway_id         = ""
+      nat_gateway_id     = ""
+    },
+    {
+      cidr_block         = "10.3.0.0/24"
+      transit_gateway_id = module.transit_gateway.transit_gateway_id
+      gateway_id         = ""
+      nat_gateway_id     = ""
+    }
+  ]
+  vpc_id = module.vpc2.vpc_id
 }
 
-resource "aws_internet_gateway" "vpc2_igw" {
-  vpc_id = aws_vpc.vpc2.id
-  tags = {
-    Name = "vpc2_igw"
-  }
+# Security Group
+module "vpc2_sg" {
+  source = "./modules/vpc/security_groups"
+  vpc_id = module.vpc2.vpc_id
+  name   = "vpc2-sg"
+  ingress = [
+    {
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      self            = "false"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+      description     = "any"
+    },
+    {
+      from_port       = 22
+      to_port         = 22
+      protocol        = "tcp"
+      self            = "false"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+      description     = "any"
+    }
+  ]
+  egress = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
 }
 
-resource "aws_route_table" "vpc2_route_table" {
-  vpc_id = aws_vpc.vpc2.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.vpc2_igw.id
-  }
-  route {
-    cidr_block         = "10.1.0.0/24"
-    transit_gateway_id = aws_ec2_transit_gateway.transit_gateway.id
-  }
-  route {
-    cidr_block         = "10.3.0.0/24"
-    transit_gateway_id = aws_ec2_transit_gateway.transit_gateway.id
-  }
-  tags = {
-    Name = "vpc2_route_table"
-  }
+module "vpc3" {
+  source                = "./modules/vpc/vpc"
+  vpc_name              = "vpc3"
+  vpc_cidr_block        = "10.3.0.0/24"
+  enable_dns_hostnames  = true
+  enable_dns_support    = true
+  internet_gateway_name = "vpc3_igw"
 }
 
-resource "aws_route_table_association" "vpc2_route_table_association" {
-  count          = length(var.vpc2_subnets)
-  subnet_id      = element(aws_subnet.vpc2_subnets[*].id, count.index)
-  route_table_id = aws_route_table.vpc2_route_table.id
+# Public Subnets
+module "vpc3_subnets" {
+  source = "./modules/vpc/subnets"
+  name   = "vpc3 subnet"
+  subnets = [
+    {
+      subnet = "10.3.0.0/28"
+      az     = "us-east-1a"
+    },
+    {
+      subnet = "10.3.0.16/28"
+      az     = "us-east-1b"
+    },
+    {
+      subnet = "10.3.0.96/28"
+      az     = "us-east-1c"
+    }
+  ]
+  vpc_id                  = module.vpc3.vpc_id
+  map_public_ip_on_launch = true
 }
 
-# VPC3
-resource "aws_vpc" "vpc3" {
-  cidr_block = "10.3.0.0/24"
-  tags = {
-    Name = "vpc3"
-  }
+# Carshub Public Route Table
+module "vpc3_rt" {
+  source  = "./modules/vpc/route_tables"
+  name    = "vpc3 route table"
+  subnets = module.vpc3_subnets.subnets[*]
+  routes = [
+    {
+      cidr_block         = "0.0.0.0/0"
+      gateway_id         = module.vpc3.igw_id
+      nat_gateway_id     = ""
+      transit_gateway_id = ""
+    },
+    {
+      cidr_block         = "10.1.0.0/24"
+      transit_gateway_id = module.transit_gateway.transit_gateway_id
+      gateway_id         = ""
+      nat_gateway_id     = ""
+    },
+    {
+      cidr_block         = "10.2.0.0/24"
+      transit_gateway_id = module.transit_gateway.transit_gateway_id
+      gateway_id         = ""
+      nat_gateway_id     = ""
+    }
+  ]
+  vpc_id = module.vpc3.vpc_id
 }
 
-resource "aws_subnet" "vpc3_subnets" {
-  count             = length(var.vpc3_subnets)
-  vpc_id            = aws_vpc.vpc3.id
-  cidr_block        = element(var.vpc3_subnets, count.index)
-  availability_zone = element(var.azs, count.index)
-  tags = {
-    Name = "vpc3_subnet ${count.index + 1}"
-  }
-}
-
-resource "aws_internet_gateway" "vpc3_igw" {
-  vpc_id = aws_vpc.vpc3.id
-  tags = {
-    Name = "vpc3_igw"
-  }
-}
-
-resource "aws_route_table" "vpc3_route_table" {
-  vpc_id = aws_vpc.vpc3.id
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.vpc3_igw.id
-  }
-  route {
-    cidr_block         = "10.1.0.0/24"
-    transit_gateway_id = aws_ec2_transit_gateway.transit_gateway.id
-  }
-  route {
-    cidr_block         = "10.2.0.0/24"
-    transit_gateway_id = aws_ec2_transit_gateway.transit_gateway.id
-  }
-  tags = {
-    Name = "vpc3_route_table"
-  }
-}
-
-resource "aws_route_table_association" "vpc3_route_table_association" {
-  count          = length(var.vpc3_subnets)
-  subnet_id      = element(aws_subnet.vpc3_subnets[*].id, count.index)
-  route_table_id = aws_route_table.vpc3_route_table.id
+# Security Group
+module "vpc3_sg" {
+  source = "./modules/vpc/security_groups"
+  vpc_id = module.vpc3.vpc_id
+  name   = "vpc3-sg"
+  ingress = [
+    {
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      self            = "false"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+      description     = "any"
+    },
+    {
+      from_port       = 22
+      to_port         = 22
+      protocol        = "tcp"
+      self            = "false"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+      description     = "any"
+    }
+  ]
+  egress = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
 }
 
 # Transit Gateway 
-resource "aws_ec2_transit_gateway" "transit_gateway" {
-  description = "Transit Gateway"
-  tags = {
-    Name = "transit-gateway"
-  }
-}
-
-# Transit Gateway Attachments
-resource "aws_ec2_transit_gateway_vpc_attachment" "tgw_attach_1" {
-  subnet_ids         = aws_subnet.vpc1_subnets[*].id
-  transit_gateway_id = aws_ec2_transit_gateway.transit_gateway.id
-  vpc_id             = aws_vpc.vpc1.id
-  depends_on         = [aws_vpc.vpc1]
-}
-
-resource "aws_ec2_transit_gateway_vpc_attachment" "tgw_attach_2" {
-  subnet_ids         = aws_subnet.vpc2_subnets[*].id
-  transit_gateway_id = aws_ec2_transit_gateway.transit_gateway.id
-  vpc_id             = aws_vpc.vpc2.id
-  depends_on         = [aws_vpc.vpc2]
-}
-
-resource "aws_ec2_transit_gateway_vpc_attachment" "tgw_attach_3" {
-  subnet_ids         = aws_subnet.vpc3_subnets[*].id
-  transit_gateway_id = aws_ec2_transit_gateway.transit_gateway.id
-  vpc_id             = aws_vpc.vpc3.id
-  depends_on         = [aws_vpc.vpc3]
-}
-
-resource "aws_security_group" "vpc1_sg" {
-  name   = "vpc1_sg"
-  vpc_id = aws_vpc.vpc1.id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-resource "aws_security_group" "vpc2_sg" {
-  name   = "vpc2_sg"
-  vpc_id = aws_vpc.vpc2.id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-resource "aws_security_group" "vpc3_sg" {
-  name   = "vpc3_sg"
-  vpc_id = aws_vpc.vpc3.id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+module "transit_gateway" {
+  source      = "./modules/transit-gateway"
+  name        = "transit-gateway"
+  description = "Transit Gateway for VPCs"
+  attachments = [
+    {
+      vpc_id     = module.vpc1.vpc_id
+      subnet_ids = module.vpc1_subnets.subnets[*].id
+    },
+    {
+      vpc_id     = module.vpc2.vpc_id
+      subnet_ids = module.vpc2_subnets.subnets[*].id
+    },
+    {
+      vpc_id     = module.vpc3.vpc_id
+      subnet_ids = module.vpc3_subnets.subnets[*].id
+    }
+  ]
 }
 
 data "aws_ami" "ubuntu" {
@@ -282,8 +328,8 @@ resource "aws_instance" "instance1" {
   associate_public_ip_address = true
   #availability_zone           = var.azs[0].id
   key_name        = data.aws_key_pair.key_pair.key_name
-  subnet_id       = aws_subnet.vpc1_subnets[0].id
-  security_groups = [aws_security_group.vpc1_sg.id]
+  subnet_id       = module.vpc1_subnets.subnets[0].id
+  security_groups = [module.vpc1_sg.id]
   user_data       = filebase64("${path.module}/user_data.sh")
   tags = {
     Name = "instance1"
@@ -296,8 +342,8 @@ resource "aws_instance" "instance2" {
   associate_public_ip_address = true
   #availability_zone           = var.azs[0].id
   key_name        = data.aws_key_pair.key_pair.key_name
-  subnet_id       = aws_subnet.vpc2_subnets[0].id
-  security_groups = [aws_security_group.vpc2_sg.id]
+  subnet_id       = module.vpc2_subnets.subnets[0].id
+  security_groups = [module.vpc2_sg.id]
   user_data       = filebase64("${path.module}/user_data.sh")
   tags = {
     Name = "instance2"
@@ -310,8 +356,8 @@ resource "aws_instance" "instance3" {
   associate_public_ip_address = true
   #availability_zone           = var.azs[0].id
   key_name        = data.aws_key_pair.key_pair.key_name
-  subnet_id       = aws_subnet.vpc3_subnets[0].id
-  security_groups = [aws_security_group.vpc3_sg.id]
+  subnet_id       = module.vpc3_subnets.subnets[0].id
+  security_groups = [module.vpc3_sg.id]
   user_data       = filebase64("${path.module}/user_data.sh")
   tags = {
     Name = "instance3"
