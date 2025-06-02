@@ -322,7 +322,8 @@ data "aws_key_pair" "key_pair" {
   key_name = "madmaxkeypair"
 }
 
-resource "aws_instance" "instance1" {
+module "instance1" {
+  source = "./modules/ec2"
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   associate_public_ip_address = true
@@ -331,12 +332,13 @@ resource "aws_instance" "instance1" {
   subnet_id       = module.vpc1_subnets.subnets[0].id
   security_groups = [module.vpc1_sg.id]
   user_data       = filebase64("${path.module}/user_data.sh")
-  tags = {
-    Name = "instance1"
-  }
+  name = "instance1"
+  
 }
 
-resource "aws_instance" "instance2" {
+module "instance2" {
+  source = "./modules/ec2"
+  name = "instance2"
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   associate_public_ip_address = true
@@ -344,22 +346,17 @@ resource "aws_instance" "instance2" {
   key_name        = data.aws_key_pair.key_pair.key_name
   subnet_id       = module.vpc2_subnets.subnets[0].id
   security_groups = [module.vpc2_sg.id]
-  user_data       = filebase64("${path.module}/user_data.sh")
-  tags = {
-    Name = "instance2"
-  }
+  user_data       = filebase64("${path.module}/user_data.sh")  
 }
 
-resource "aws_instance" "instance3" {
+module "instance3" {
+  source = "./modules/ec2"
+  name = "instance3"
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   associate_public_ip_address = true
-  #availability_zone           = var.azs[0].id
   key_name        = data.aws_key_pair.key_pair.key_name
   subnet_id       = module.vpc3_subnets.subnets[0].id
   security_groups = [module.vpc3_sg.id]
-  user_data       = filebase64("${path.module}/user_data.sh")
-  tags = {
-    Name = "instance3"
-  }
+  user_data       = filebase64("${path.module}/user_data.sh")  
 }
