@@ -323,7 +323,7 @@ data "aws_key_pair" "key_pair" {
 }
 
 module "instance1" {
-  source = "./modules/ec2"
+  source                      = "./modules/ec2"
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   associate_public_ip_address = true
@@ -332,13 +332,13 @@ module "instance1" {
   subnet_id       = module.vpc1_subnets.subnets[0].id
   security_groups = [module.vpc1_sg.id]
   user_data       = filebase64("${path.module}/user_data.sh")
-  name = "instance1"
-  
+  name            = "instance1"
+
 }
 
 module "instance2" {
-  source = "./modules/ec2"
-  name = "instance2"
+  source                      = "./modules/ec2"
+  name                        = "instance2"
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   associate_public_ip_address = true
@@ -346,17 +346,17 @@ module "instance2" {
   key_name        = data.aws_key_pair.key_pair.key_name
   subnet_id       = module.vpc2_subnets.subnets[0].id
   security_groups = [module.vpc2_sg.id]
-  user_data       = filebase64("${path.module}/user_data.sh")  
+  user_data       = filebase64("${path.module}/user_data.sh")
 }
 
 module "instance3" {
-  source = "./modules/ec2"
-  name = "instance3"
+  source                      = "./modules/ec2"
+  name                        = "instance3"
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   associate_public_ip_address = true
-  key_name        = data.aws_key_pair.key_pair.key_name
-  subnet_id       = module.vpc3_subnets.subnets[0].id
-  security_groups = [module.vpc3_sg.id]
-  user_data       = filebase64("${path.module}/user_data.sh")  
+  key_name                    = data.aws_key_pair.key_pair.key_name
+  subnet_id                   = module.vpc3_subnets.subnets[0].id
+  security_groups             = [module.vpc3_sg.id]
+  user_data                   = filebase64("${path.module}/user_data.sh")
 }
