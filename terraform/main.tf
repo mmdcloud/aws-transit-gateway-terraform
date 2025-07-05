@@ -331,7 +331,7 @@ module "instance1" {
   key_name        = data.aws_key_pair.key_pair.key_name
   subnet_id       = module.vpc1_subnets.subnets[0].id
   security_groups = [module.vpc1_sg.id]
-  user_data       = filebase64("${path.module}/user_data.sh")
+  user_data       = filebase64("${path.module}/scripts/user_data.sh")
   name            = "instance1"
 
 }
