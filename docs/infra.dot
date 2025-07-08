@@ -1,0 +1,68 @@
+digraph INFRA {
+  node [ color = "black", fillcolor = "#E6E6E6", height =1, style = "filled,bold,rounded", fontname = "Arial" ];
+  "vpc1" [ label = "vpc1
+(AWS::EC2::VPC)" ];
+  "vpc2" [ label = "vpc2
+(AWS::EC2::VPC)" ];
+  "vpc3" [ label = "vpc3
+(AWS::EC2::VPC)" ];
+  "vpc1_igw" [ label = "vpc1_igw
+(AWS::EC2::InternetGateway)" ];
+  "vpc2_igw" [ label = "vpc2_igw
+(AWS::EC2::InternetGateway)" ];
+  "vpc3_igw" [ label = "vpc3_igw
+(AWS::EC2::InternetGateway)" ];
+  "vpc1_subnets" [ label = "vpc1_subnets
+(AWS::EC2::Subnet)" ];
+  "vpc2_subnets" [ label = "vpc2_subnets
+(AWS::EC2::Subnet)" ];
+  "vpc3_subnets" [ label = "vpc3_subnets
+(AWS::EC2::Subnet)" ];
+  "vpc1_rt" [ label = "vpc1_rt
+(AWS::EC2::RouteTable)" ];
+  "vpc2_rt" [ label = "vpc2_rt
+(AWS::EC2::RouteTable)" ];
+  "vpc3_rt" [ label = "vpc3_rt
+(AWS::EC2::RouteTable)" ];
+  "vpc1_sg" [ label = "vpc1_sg
+(AWS::EC2::SecurityGroup)" ];
+  "vpc2_sg" [ label = "vpc2_sg
+(AWS::EC2::SecurityGroup)" ];
+  "vpc3_sg" [ label = "vpc3_sg
+(AWS::EC2::SecurityGroup)" ];
+  "transit_gateway" [ label = "transit_gateway
+(AWS::EC2::TransitGateway)" ];
+  "instance1" [ label = "instance1
+(AWS::EC2::Instance)", shape =rectangle, fillcolor = "#B7E0FF" ];
+  "instance2" [ label = "instance2
+(AWS::EC2::Instance)", shape =rectangle, fillcolor = "#B7E0FF" ];
+  "instance3" [ label = "instance3
+(AWS::EC2::Instance)", shape =rectangle, fillcolor = "#B7E0FF" ];
+  "vpc1_igw" -> "vpc1";
+  "vpc2_igw" -> "vpc2";
+  "vpc3_igw" -> "vpc3";
+  "vpc1_subnets" -> "vpc1";
+  "vpc2_subnets" -> "vpc2";
+  "vpc3_subnets" -> "vpc3";
+  "vpc1_rt" -> "vpc1";
+  "vpc1_rt" -> "vpc1_igw";
+  "vpc1_rt" -> "transit_gateway";
+  "vpc2_rt" -> "vpc2";
+  "vpc2_rt" -> "vpc2_igw";
+  "vpc2_rt" -> "transit_gateway";
+  "vpc3_rt" -> "vpc3";
+  "vpc3_rt" -> "vpc3_igw";
+  "vpc3_rt" -> "transit_gateway";
+  "vpc1_sg" -> "vpc1";
+  "vpc2_sg" -> "vpc2";
+  "vpc3_sg" -> "vpc3";
+  "transit_gateway" -> "vpc1";
+  "transit_gateway" -> "vpc2";
+  "transit_gateway" -> "vpc3";
+  "instance1" -> "vpc1_subnets";
+  "instance1" -> "vpc1_sg";
+  "instance2" -> "vpc2_subnets";
+  "instance2" -> "vpc2_sg";
+  "instance3" -> "vpc3_subnets";
+  "instance3" -> "vpc3_sg";
+}
