@@ -346,7 +346,7 @@ module "instance2" {
   key_name        = data.aws_key_pair.key_pair.key_name
   subnet_id       = module.vpc2_subnets.subnets[0].id
   security_groups = [module.vpc2_sg.id]
-  user_data       = filebase64("${path.module}/user_data.sh")
+  user_data       = filebase64("${path.module}/scripts/user_data.sh")
 }
 
 module "instance3" {
@@ -358,5 +358,5 @@ module "instance3" {
   key_name                    = data.aws_key_pair.key_pair.key_name
   subnet_id                   = module.vpc3_subnets.subnets[0].id
   security_groups             = [module.vpc3_sg.id]
-  user_data                   = filebase64("${path.module}/user_data.sh")
+  user_data                   = filebase64("${path.module}/scripts/user_data.sh")
 }
