@@ -3,22 +3,34 @@ variable "region" {
   default = "us-east-1"
 }
 
-variable "vpc1_subnets" {
-  type        = list(string)
-  description = "VPC1 Subnets"
-  default     = ["10.1.0.0/28", "10.1.0.16/28", "10.1.0.96/28"]
+variable "vpc1_private_subnets" {
+  type    = list(string)
+  default = []
 }
 
-variable "vpc2_subnets" {
-  type        = list(string)
-  description = "VPC2 Subnets"
-  default     = ["10.2.0.0/28", "10.2.0.16/28", "10.2.0.96/28"]
+variable "vpc1_public_subnets" {
+  type    = list(string)
+  default = []
 }
 
-variable "vpc3_subnets" {
-  type        = list(string)
-  description = "VPC3 Subnets"
-  default     = ["10.3.0.0/28", "10.3.0.16/28", "10.3.0.96/28"]
+variable "vpc2_private_subnets" {
+  type    = list(string)
+  default = []
+}
+
+variable "vpc2_public_subnets" {
+  type    = list(string)
+  default = []
+}
+
+variable "vpc3_private_subnets" {
+  type    = list(string)
+  default = []
+}
+
+variable "vpc3_public_subnets" {
+  type    = list(string)
+  default = []
 }
 
 variable "azs" {

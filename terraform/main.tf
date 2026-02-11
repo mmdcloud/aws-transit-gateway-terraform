@@ -1,69 +1,31 @@
+# ----------------------------------------------------------------------
 # VPC Configuration
+# ----------------------------------------------------------------------
 module "vpc1" {
-  source                = "./modules/vpc/vpc"
-  vpc_name              = "vpc1"
-  vpc_cidr_block        = "10.1.0.0/24"
-  enable_dns_hostnames  = true
-  enable_dns_support    = true
-  internet_gateway_name = "vpc1_igw"
-}
-
-# Public Subnets
-module "vpc1_subnets" {
-  source = "./modules/vpc/subnets"
-  name   = "vpc1 public subnet"
-  subnets = [
-    {
-      subnet = "10.1.0.0/28"
-      az     = "us-east-1a"
-    },
-    {
-      subnet = "10.1.0.16/28"
-      az     = "us-east-1b"
-    },
-    {
-      subnet = "10.1.0.96/28"
-      az     = "us-east-1c"
-    }
-  ]
-  vpc_id                  = module.vpc1.vpc_id
+  source                  = "./modules/vpc"
+  vpc_name                = "vpc1"
+  vpc_cidr                = "10.1.0.0/16"
+  azs                     = var.azs
+  public_subnets          = var.vpc1_public_subnets
+  private_subnets         = var.vpc1_private_subnets
+  enable_dns_hostnames    = true
+  enable_dns_support      = true
+  create_igw              = true
   map_public_ip_on_launch = true
-}
-
-# Carshub Public Route Table
-module "vpc1_rt" {
-  source  = "./modules/vpc/route_tables"
-  name    = "vpc1 route table"
-  subnets = module.vpc1_subnets.subnets[*]
-  routes = [
-    {
-      cidr_block         = "0.0.0.0/0"
-      gateway_id         = module.vpc1.igw_id
-      nat_gateway_id     = ""
-      transit_gateway_id = ""
-    },
-    {
-      cidr_block         = "10.2.0.0/24"
-      transit_gateway_id = module.transit_gateway.transit_gateway_id
-      gateway_id         = ""
-      nat_gateway_id     = ""
-    },
-    {
-      cidr_block         = "10.3.0.0/24"
-      transit_gateway_id = module.transit_gateway.transit_gateway_id
-      gateway_id         = ""
-      nat_gateway_id     = ""
-    }
-  ]
-  vpc_id = module.vpc1.vpc_id
+  enable_nat_gateway      = false
+  single_nat_gateway      = false
+  one_nat_gateway_per_az  = false
+  tags = {
+    Name = "vpc1"
+  }
 }
 
 # Security Group
 module "vpc1_sg" {
-  source = "./modules/vpc/security_groups"
+  source = "./modules/security-groups"
   vpc_id = module.vpc1.vpc_id
   name   = "vpc1-sg"
-  ingress = [
+  ingress_rules = [
     {
       from_port       = 80
       to_port         = 80
@@ -83,7 +45,7 @@ module "vpc1_sg" {
       description     = "any"
     }
   ]
-  egress = [
+  egress_rules = [
     {
       from_port   = 0
       to_port     = 0
@@ -94,70 +56,30 @@ module "vpc1_sg" {
 }
 
 module "vpc2" {
-  source                = "./modules/vpc/vpc"
-  vpc_name              = "vpc2"
-  vpc_cidr_block        = "10.2.0.0/24"
-  enable_dns_hostnames  = true
-  enable_dns_support    = true
-  internet_gateway_name = "vpc2_igw"
-}
-
-# Public Subnets
-module "vpc2_subnets" {
-  source = "./modules/vpc/subnets"
-  name   = "vpc2 subnet"
-  subnets = [
-    {
-      subnet = "10.2.0.0/28"
-      az     = "us-east-1a"
-    },
-    {
-      subnet = "10.2.0.16/28"
-      az     = "us-east-1b"
-    },
-    {
-      subnet = "10.2.0.96/28"
-      az     = "us-east-1c"
-    }
-  ]
-  vpc_id                  = module.vpc2.vpc_id
+  source                  = "./modules/vpc"
+  vpc_name                = "vpc2"
+  vpc_cidr                = "10.2.0.0/16"
+  azs                     = var.azs
+  public_subnets          = var.vpc2_public_subnets
+  private_subnets         = var.vpc2_private_subnets
+  enable_dns_hostnames    = true
+  enable_dns_support      = true
+  create_igw              = true
   map_public_ip_on_launch = true
-}
-
-# Carshub Public Route Table
-module "vpc2_rt" {
-  source  = "./modules/vpc/route_tables"
-  name    = "vpc2 route table"
-  subnets = module.vpc2_subnets.subnets[*]
-  routes = [
-    {
-      cidr_block         = "0.0.0.0/0"
-      gateway_id         = module.vpc2.igw_id
-      nat_gateway_id     = ""
-      transit_gateway_id = ""
-    },
-    {
-      cidr_block         = "10.1.0.0/24"
-      transit_gateway_id = module.transit_gateway.transit_gateway_id
-      gateway_id         = ""
-      nat_gateway_id     = ""
-    },
-    {
-      cidr_block         = "10.3.0.0/24"
-      transit_gateway_id = module.transit_gateway.transit_gateway_id
-      gateway_id         = ""
-      nat_gateway_id     = ""
-    }
-  ]
-  vpc_id = module.vpc2.vpc_id
+  enable_nat_gateway      = false
+  single_nat_gateway      = false
+  one_nat_gateway_per_az  = false
+  tags = {
+    Name = "vpc2"
+  }
 }
 
 # Security Group
 module "vpc2_sg" {
-  source = "./modules/vpc/security_groups"
+  source = "./modules/security-groups"
   vpc_id = module.vpc2.vpc_id
   name   = "vpc2-sg"
-  ingress = [
+  ingress_rules = [
     {
       from_port       = 80
       to_port         = 80
@@ -177,7 +99,7 @@ module "vpc2_sg" {
       description     = "any"
     }
   ]
-  egress = [
+  egress_rules = [
     {
       from_port   = 0
       to_port     = 0
@@ -188,70 +110,30 @@ module "vpc2_sg" {
 }
 
 module "vpc3" {
-  source                = "./modules/vpc/vpc"
-  vpc_name              = "vpc3"
-  vpc_cidr_block        = "10.3.0.0/24"
-  enable_dns_hostnames  = true
-  enable_dns_support    = true
-  internet_gateway_name = "vpc3_igw"
-}
-
-# Public Subnets
-module "vpc3_subnets" {
-  source = "./modules/vpc/subnets"
-  name   = "vpc3 subnet"
-  subnets = [
-    {
-      subnet = "10.3.0.0/28"
-      az     = "us-east-1a"
-    },
-    {
-      subnet = "10.3.0.16/28"
-      az     = "us-east-1b"
-    },
-    {
-      subnet = "10.3.0.96/28"
-      az     = "us-east-1c"
-    }
-  ]
-  vpc_id                  = module.vpc3.vpc_id
+  source                  = "./modules/vpc"
+  vpc_name                = "vpc3"
+  vpc_cidr                = "10.3.0.0/16"
+  azs                     = var.azs
+  public_subnets          = var.vpc3_public_subnets
+  private_subnets         = var.vpc3_private_subnets
+  enable_dns_hostnames    = true
+  enable_dns_support      = true
+  create_igw              = true
   map_public_ip_on_launch = true
-}
-
-# Carshub Public Route Table
-module "vpc3_rt" {
-  source  = "./modules/vpc/route_tables"
-  name    = "vpc3 route table"
-  subnets = module.vpc3_subnets.subnets[*]
-  routes = [
-    {
-      cidr_block         = "0.0.0.0/0"
-      gateway_id         = module.vpc3.igw_id
-      nat_gateway_id     = ""
-      transit_gateway_id = ""
-    },
-    {
-      cidr_block         = "10.1.0.0/24"
-      transit_gateway_id = module.transit_gateway.transit_gateway_id
-      gateway_id         = ""
-      nat_gateway_id     = ""
-    },
-    {
-      cidr_block         = "10.2.0.0/24"
-      transit_gateway_id = module.transit_gateway.transit_gateway_id
-      gateway_id         = ""
-      nat_gateway_id     = ""
-    }
-  ]
-  vpc_id = module.vpc3.vpc_id
+  enable_nat_gateway      = false
+  single_nat_gateway      = false
+  one_nat_gateway_per_az  = false
+  tags = {
+    Name = "vpc3"
+  }
 }
 
 # Security Group
 module "vpc3_sg" {
-  source = "./modules/vpc/security_groups"
+  source = "./modules/security-groups"
   vpc_id = module.vpc3.vpc_id
   name   = "vpc3-sg"
-  ingress = [
+  ingress_rules = [
     {
       from_port       = 80
       to_port         = 80
@@ -271,7 +153,7 @@ module "vpc3_sg" {
       description     = "any"
     }
   ]
-  egress = [
+  egress_rules = [
     {
       from_port   = 0
       to_port     = 0
@@ -281,7 +163,9 @@ module "vpc3_sg" {
   ]
 }
 
-# Transit Gateway 
+# ----------------------------------------------------------------------
+# Transit Gateway Configuration
+# ----------------------------------------------------------------------
 module "transit_gateway" {
   source      = "./modules/transit-gateway"
   name        = "transit-gateway"
@@ -289,19 +173,22 @@ module "transit_gateway" {
   attachments = [
     {
       vpc_id     = module.vpc1.vpc_id
-      subnet_ids = module.vpc1_subnets.subnets[*].id
+      subnet_ids = module.vpc1.public_subnets
     },
     {
       vpc_id     = module.vpc2.vpc_id
-      subnet_ids = module.vpc2_subnets.subnets[*].id
+      subnet_ids = module.vpc2.public_subnets
     },
     {
       vpc_id     = module.vpc3.vpc_id
-      subnet_ids = module.vpc3_subnets.subnets[*].id
+      subnet_ids = module.vpc3.public_subnets
     }
   ]
 }
 
+# ----------------------------------------------------------------------
+# Test Instances
+# ----------------------------------------------------------------------
 data "aws_ami" "ubuntu" {
   most_recent = true
 
@@ -329,11 +216,10 @@ module "instance1" {
   associate_public_ip_address = true
   #availability_zone           = var.azs[0].id
   key_name        = data.aws_key_pair.key_pair.key_name
-  subnet_id       = module.vpc1_subnets.subnets[0].id
+  subnet_id       = module.vpc1.public_subnets[0]
   security_groups = [module.vpc1_sg.id]
   user_data       = filebase64("${path.module}/scripts/user_data.sh")
   name            = "instance1"
-
 }
 
 module "instance2" {
@@ -344,7 +230,7 @@ module "instance2" {
   associate_public_ip_address = true
   #availability_zone           = var.azs[0].id
   key_name        = data.aws_key_pair.key_pair.key_name
-  subnet_id       = module.vpc2_subnets.subnets[0].id
+  subnet_id       = module.vpc2.public_subnets[0]
   security_groups = [module.vpc2_sg.id]
   user_data       = filebase64("${path.module}/scripts/user_data.sh")
 }
@@ -356,7 +242,7 @@ module "instance3" {
   instance_type               = "t2.micro"
   associate_public_ip_address = true
   key_name                    = data.aws_key_pair.key_pair.key_name
-  subnet_id                   = module.vpc3_subnets.subnets[0].id
+  subnet_id                   = module.vpc3.public_subnets[0]
   security_groups             = [module.vpc3_sg.id]
   user_data                   = filebase64("${path.module}/scripts/user_data.sh")
 }
