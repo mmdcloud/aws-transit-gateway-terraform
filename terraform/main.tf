@@ -31,16 +31,7 @@ module "vpc1_sg" {
       to_port         = 80
       protocol        = "tcp"
       self            = "false"
-      cidr_blocks     = ["0.0.0.0/0"]
-      security_groups = []
-      description     = "any"
-    },
-    {
-      from_port       = 22
-      to_port         = 22
-      protocol        = "tcp"
-      self            = "false"
-      cidr_blocks     = ["0.0.0.0/0"]
+      cidr_blocks     = ["10.2.1.0/24", "10.2.2.0/24", "10.2.3.0/24","10.3.1.0/24", "10.3.2.0/24", "10.3.3.0/24"]
       security_groups = []
       description     = "any"
     }
@@ -85,16 +76,7 @@ module "vpc2_sg" {
       to_port         = 80
       protocol        = "tcp"
       self            = "false"
-      cidr_blocks     = ["0.0.0.0/0"]
-      security_groups = []
-      description     = "any"
-    },
-    {
-      from_port       = 22
-      to_port         = 22
-      protocol        = "tcp"
-      self            = "false"
-      cidr_blocks     = ["0.0.0.0/0"]
+      cidr_blocks     = ["10.1.1.0/24", "10.1.2.0/24", "10.1.3.0/24","10.3.1.0/24", "10.3.2.0/24", "10.3.3.0/24"]
       security_groups = []
       description     = "any"
     }
@@ -139,7 +121,7 @@ module "vpc3_sg" {
       to_port         = 80
       protocol        = "tcp"
       self            = "false"
-      cidr_blocks     = ["0.0.0.0/0"]
+      cidr_blocks     = ["10.1.1.0/24", "10.1.2.0/24", "10.1.3.0/24","10.2.1.0/24", "10.2.2.0/24", "10.2.3.0/24"]
       security_groups = []
       description     = "any"
     },
@@ -184,6 +166,45 @@ module "transit_gateway" {
       subnet_ids = module.vpc3.public_subnets
     }
   ]
+}
+
+# Add routes to VPC1 route table for VPC2 and VPC3
+resource "aws_route" "vpc1_to_vpc2" {
+  route_table_id         = module.vpc1.public_route_table_ids[0]
+  destination_cidr_block = "10.2.0.0/16"
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+}
+
+resource "aws_route" "vpc1_to_vpc3" {
+  route_table_id         = module.vpc1.public_route_table_ids[0]
+  destination_cidr_block = "10.3.0.0/16"
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+}
+
+# Add routes to VPC2 route table for VPC1 and VPC3
+resource "aws_route" "vpc2_to_vpc1" {
+  route_table_id         = module.vpc2.public_route_table_ids[0]
+  destination_cidr_block = "10.1.0.0/16"
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+}
+
+resource "aws_route" "vpc2_to_vpc3" {
+  route_table_id         = module.vpc2.public_route_table_ids[0]
+  destination_cidr_block = "10.3.0.0/16"
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+}
+
+# Add routes to VPC3 route table for VPC1 and VPC2
+resource "aws_route" "vpc3_to_vpc1" {
+  route_table_id         = module.vpc3.public_route_table_ids[0]
+  destination_cidr_block = "10.1.0.0/16"
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+}
+
+resource "aws_route" "vpc3_to_vpc2" {
+  route_table_id         = module.vpc3.public_route_table_ids[0]
+  destination_cidr_block = "10.2.0.0/16"
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
 }
 
 # ----------------------------------------------------------------------
@@ -246,3 +267,4 @@ module "instance3" {
   security_groups             = [module.vpc3_sg.id]
   user_data                   = filebase64("${path.module}/scripts/user_data.sh")
 }
+
