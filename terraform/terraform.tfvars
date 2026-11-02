@@ -4,5 +4,5 @@ vpc2_public_subnets  = ["10.2.1.0/24", "10.2.2.0/24", "10.2.3.0/24"]
 vpc2_private_subnets = ["10.2.4.0/24", "10.2.5.0/24", "10.2.6.0/24"]
 vpc3_public_subnets  = ["10.3.1.0/24", "10.3.2.0/24", "10.3.3.0/24"]
 vpc3_private_subnets = ["10.3.4.0/24", "10.3.5.0/24", "10.3.6.0/24"]
-azs                  = ["us-east-1a", "us-east-1b", "us-east-1c"]
-region               = "us-east-1"
+azs                  = ["ap-south-1a", "ap-south-1b", "ap-south-1c"]
+region               = "ap-south-1"

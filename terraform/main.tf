@@ -31,9 +31,18 @@ module "vpc1_sg" {
       to_port         = 80
       protocol        = "tcp"
       self            = "false"
-      cidr_blocks     = ["10.2.1.0/24", "10.2.2.0/24", "10.2.3.0/24","10.3.1.0/24", "10.3.2.0/24", "10.3.3.0/24"]
+      cidr_blocks     = ["10.0.0.0/8"]
       security_groups = []
-      description     = "any"
+      description     = "HTTP from spoke subnets"
+    },
+    {
+      from_port       = -1
+      to_port         = -1
+      protocol        = "icmp"
+      self            = "false"
+      cidr_blocks     = ["10.0.0.0/8"]
+      security_groups = []
+      description     = "ICMP ping from spoke subnets"
     }
   ]
   egress_rules = [
@@ -76,9 +85,18 @@ module "vpc2_sg" {
       to_port         = 80
       protocol        = "tcp"
       self            = "false"
-      cidr_blocks     = ["10.1.1.0/24", "10.1.2.0/24", "10.1.3.0/24","10.3.1.0/24", "10.3.2.0/24", "10.3.3.0/24"]
+      cidr_blocks     = ["10.0.0.0/8"]
       security_groups = []
-      description     = "any"
+      description     = "HTTP from spoke subnets"
+    },
+    {
+      from_port       = -1
+      to_port         = -1
+      protocol        = "icmp"
+      self            = "false"
+      cidr_blocks     = ["10.0.0.0/8"]
+      security_groups = []
+      description     = "ICMP ping from spoke subnets"
     }
   ]
   egress_rules = [
@@ -121,9 +139,18 @@ module "vpc3_sg" {
       to_port         = 80
       protocol        = "tcp"
       self            = "false"
-      cidr_blocks     = ["10.1.1.0/24", "10.1.2.0/24", "10.1.3.0/24","10.2.1.0/24", "10.2.2.0/24", "10.2.3.0/24"]
+      cidr_blocks     = ["10.0.0.0/8"]
       security_groups = []
-      description     = "any"
+      description     = "HTTP from spoke subnets"
+    },
+    {
+      from_port       = -1
+      to_port         = -1
+      protocol        = "icmp"
+      self            = "false"
+      cidr_blocks     = ["10.0.0.0/8"]
+      security_groups = []
+      description     = "ICMP ping from spoke subnets"
     },
     {
       from_port       = 22
@@ -132,7 +159,7 @@ module "vpc3_sg" {
       self            = "false"
       cidr_blocks     = ["0.0.0.0/0"]
       security_groups = []
-      description     = "any"
+      description     = "SSH access"
     }
   ]
   egress_rules = [
@@ -145,66 +172,136 @@ module "vpc3_sg" {
   ]
 }
 
+module "egress_vpc" {
+  source                  = "./modules/vpc"
+  vpc_name                = "egress-vpc"
+  vpc_cidr                = "10.100.0.0/16"
+  azs                     = var.azs
+  public_subnets          = ["10.100.1.0/24", "10.100.2.0/24", "10.100.3.0/24"]
+  private_subnets         = ["10.100.4.0/24", "10.100.5.0/24", "10.100.6.0/24"] # Used for TGW attachments
+  enable_dns_hostnames    = true
+  enable_dns_support      = true
+  create_igw              = true
+  map_public_ip_on_launch = true
+  enable_nat_gateway      = true
+  single_nat_gateway      = true # Set to false and one_nat_gateway_per_az = true for Multi-AZ HA
+  one_nat_gateway_per_az  = false
+  tags = {
+    Name = "egress-vpc"
+  }
+}
+
 # ----------------------------------------------------------------------
 # Transit Gateway Configuration
 # ----------------------------------------------------------------------
 module "transit_gateway" {
   source      = "./modules/transit-gateway"
   name        = "transit-gateway"
-  description = "Transit Gateway for VPCs"
-  attachments = [
+  description = "Transit Gateway with Centralized NAT"
+
+  spoke_attachments = [
     {
       vpc_id     = module.vpc1.vpc_id
-      subnet_ids = module.vpc1.public_subnets
+      subnet_ids = module.vpc1.private_subnets
+      name       = "vpc1-attachment"
     },
     {
       vpc_id     = module.vpc2.vpc_id
-      subnet_ids = module.vpc2.public_subnets
+      subnet_ids = module.vpc2.private_subnets
+      name       = "vpc2-attachment"
     },
     {
       vpc_id     = module.vpc3.vpc_id
-      subnet_ids = module.vpc3.public_subnets
+      subnet_ids = module.vpc3.private_subnets
+      name       = "vpc3-attachment"
     }
   ]
+
+  egress_attachment = {
+    vpc_id     = module.egress_vpc.vpc_id
+    subnet_ids = module.egress_vpc.private_subnets
+    name       = "egress-attachment"
+  }
 }
 
-# Add routes to VPC1 route table for VPC2 and VPC3
+# ----------------------------------------------------------------------
+# Route Table Routes
+# ----------------------------------------------------------------------
+
+# Default route 0.0.0.0/0 from Spoke Private Subnets to Transit Gateway
+resource "aws_route" "vpc1_private_default" {
+  count                  = length(var.vpc1_private_subnets)
+  route_table_id         = module.vpc1.private_route_table_ids[count.index]
+  destination_cidr_block = "0.0.0.0/0"
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway]
+}
+
+resource "aws_route" "vpc2_private_default" {
+  count                  = length(var.vpc2_private_subnets)
+  route_table_id         = module.vpc2.private_route_table_ids[count.index]
+  destination_cidr_block = "0.0.0.0/0"
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway]
+}
+
+resource "aws_route" "vpc3_private_default" {
+  count                  = length(var.vpc3_private_subnets)
+  route_table_id         = module.vpc3.private_route_table_ids[count.index]
+  destination_cidr_block = "0.0.0.0/0"
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway]
+}
+
+# Inter-VPC routes for Spoke Public Subnets
 resource "aws_route" "vpc1_to_vpc2" {
   route_table_id         = module.vpc1.public_route_table_ids[0]
   destination_cidr_block = "10.2.0.0/16"
   transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway]
 }
 
 resource "aws_route" "vpc1_to_vpc3" {
   route_table_id         = module.vpc1.public_route_table_ids[0]
   destination_cidr_block = "10.3.0.0/16"
   transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway]
 }
 
-# Add routes to VPC2 route table for VPC1 and VPC3
 resource "aws_route" "vpc2_to_vpc1" {
   route_table_id         = module.vpc2.public_route_table_ids[0]
   destination_cidr_block = "10.1.0.0/16"
   transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway]
 }
 
 resource "aws_route" "vpc2_to_vpc3" {
   route_table_id         = module.vpc2.public_route_table_ids[0]
   destination_cidr_block = "10.3.0.0/16"
   transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway]
 }
 
-# Add routes to VPC3 route table for VPC1 and VPC2
 resource "aws_route" "vpc3_to_vpc1" {
   route_table_id         = module.vpc3.public_route_table_ids[0]
   destination_cidr_block = "10.1.0.0/16"
   transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway]
 }
 
 resource "aws_route" "vpc3_to_vpc2" {
   route_table_id         = module.vpc3.public_route_table_ids[0]
   destination_cidr_block = "10.2.0.0/16"
   transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway]
+}
+
+# Return route in Egress VPC Public Subnet to route spoke traffic back into Transit Gateway
+resource "aws_route" "egress_public_return_to_tgw" {
+  route_table_id         = module.egress_vpc.public_route_table_ids[0]
+  destination_cidr_block = "10.0.0.0/8"
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway]
 }
 
 # ----------------------------------------------------------------------
@@ -227,20 +324,51 @@ data "aws_ami" "ubuntu" {
 }
 
 data "aws_key_pair" "key_pair" {
-  key_name = "madmaxkeypair"
+  key_name = "mohitd"
+}
+
+# ----------------------------------------------------------------------
+# IAM Role & Instance Profile for AWS Systems Manager (SSM)
+# ----------------------------------------------------------------------
+resource "aws_iam_role" "ssm_role" {
+  name = "ec2-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ssm_policy" {
+  role       = aws_iam_role.ssm_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ssm_profile" {
+  name = "ec2-ssm-instance-profile"
+  role = aws_iam_role.ssm_role.name
 }
 
 module "instance1" {
   source                      = "./modules/ec2"
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
-  associate_public_ip_address = true
+  associate_public_ip_address = false
   #availability_zone           = var.azs[0].id
-  key_name        = data.aws_key_pair.key_pair.key_name
-  subnet_id       = module.vpc1.public_subnets[0]
-  security_groups = [module.vpc1_sg.id]
-  user_data       = filebase64("${path.module}/scripts/user_data.sh")
-  name            = "instance1"
+  key_name             = data.aws_key_pair.key_pair.key_name
+  subnet_id            = module.vpc1.private_subnets[0]
+  security_groups      = [module.vpc1_sg.id]
+  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
+  user_data            = filebase64("${path.module}/scripts/user_data.sh")
+  name                 = "instance1"
 }
 
 module "instance2" {
@@ -248,12 +376,13 @@ module "instance2" {
   name                        = "instance2"
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
-  associate_public_ip_address = true
+  associate_public_ip_address = false
   #availability_zone           = var.azs[0].id
-  key_name        = data.aws_key_pair.key_pair.key_name
-  subnet_id       = module.vpc2.public_subnets[0]
-  security_groups = [module.vpc2_sg.id]
-  user_data       = filebase64("${path.module}/scripts/user_data.sh")
+  key_name             = data.aws_key_pair.key_pair.key_name
+  subnet_id            = module.vpc2.private_subnets[0]
+  security_groups      = [module.vpc2_sg.id]
+  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
+  user_data            = filebase64("${path.module}/scripts/user_data.sh")
 }
 
 module "instance3" {
@@ -261,10 +390,10 @@ module "instance3" {
   name                        = "instance3"
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
-  associate_public_ip_address = true
+  associate_public_ip_address = false
   key_name                    = data.aws_key_pair.key_pair.key_name
-  subnet_id                   = module.vpc3.public_subnets[0]
+  subnet_id                   = module.vpc3.private_subnets[0]
   security_groups             = [module.vpc3_sg.id]
+  iam_instance_profile        = aws_iam_instance_profile.ssm_profile.name
   user_data                   = filebase64("${path.module}/scripts/user_data.sh")
 }
-

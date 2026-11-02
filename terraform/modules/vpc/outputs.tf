@@ -17,3 +17,12 @@ output "database_subnets" {
 output "public_route_table_ids" {
   value = module.vpc.public_route_table_ids
 }
+
+output "private_route_table_ids" {
+  value = module.vpc.private_route_table_ids
+}
+
+output "natgw_ids" {
+  value = module.vpc.natgw_ids
+}
+
