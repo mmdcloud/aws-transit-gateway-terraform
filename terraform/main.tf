@@ -8,6 +8,7 @@ module "vpc1" {
   azs                     = var.azs
   public_subnets          = var.vpc1_public_subnets
   private_subnets         = var.vpc1_private_subnets
+  intra_subnets           = var.vpc1_tgw_subnets
   enable_dns_hostnames    = true
   enable_dns_support      = true
   create_igw              = true
@@ -62,6 +63,7 @@ module "vpc2" {
   azs                     = var.azs
   public_subnets          = var.vpc2_public_subnets
   private_subnets         = var.vpc2_private_subnets
+  intra_subnets           = var.vpc2_tgw_subnets
   enable_dns_hostnames    = true
   enable_dns_support      = true
   create_igw              = true
@@ -116,6 +118,7 @@ module "vpc3" {
   azs                     = var.azs
   public_subnets          = var.vpc3_public_subnets
   private_subnets         = var.vpc3_private_subnets
+  intra_subnets           = var.vpc3_tgw_subnets
   enable_dns_hostnames    = true
   enable_dns_support      = true
   create_igw              = true
@@ -172,22 +175,115 @@ module "vpc3_sg" {
   ]
 }
 
+# ----------------------------------------------------------------------
+# Centralized Egress VPC (Multi-AZ NAT Gateways)
+# ----------------------------------------------------------------------
 module "egress_vpc" {
   source                  = "./modules/vpc"
   vpc_name                = "egress-vpc"
   vpc_cidr                = "10.100.0.0/16"
   azs                     = var.azs
-  public_subnets          = ["10.100.1.0/24", "10.100.2.0/24", "10.100.3.0/24"]
-  private_subnets         = ["10.100.4.0/24", "10.100.5.0/24", "10.100.6.0/24"] # Used for TGW attachments
+  public_subnets          = var.egress_public_subnets
+  private_subnets         = var.egress_tgw_subnets # Dedicated /28 subnets for TGW attachment
   enable_dns_hostnames    = true
   enable_dns_support      = true
   create_igw              = true
   map_public_ip_on_launch = true
+  
+  # Multi-AZ High Availability NAT Gateways (1 per AZ)
   enable_nat_gateway      = true
-  single_nat_gateway      = true # Set to false and one_nat_gateway_per_az = true for Multi-AZ HA
-  one_nat_gateway_per_az  = false
+  single_nat_gateway      = false
+  one_nat_gateway_per_az  = true
+
   tags = {
-    Name = "egress-vpc"
+    Name        = "egress-vpc"
+    Environment = "Core-Network"
+  }
+}
+
+# ----------------------------------------------------------------------
+# Centralized Inspection VPC (Suricata NVA IDS/IPS)
+# ----------------------------------------------------------------------
+module "inspection_vpc" {
+  source                  = "./modules/vpc"
+  vpc_name                = "inspection-vpc"
+  vpc_cidr                = "10.200.0.0/16"
+  azs                     = var.azs
+  private_subnets         = var.inspection_appliance_subnets
+  intra_subnets           = var.inspection_tgw_subnets
+  enable_dns_hostnames    = true
+  enable_dns_support      = true
+  create_igw              = false
+  enable_nat_gateway      = false
+  single_nat_gateway      = false
+  one_nat_gateway_per_az  = false
+
+  tags = {
+    Name        = "inspection-vpc"
+    Environment = "Security-Core"
+  }
+}
+
+# Security Group for Suricata NVA Appliance (Permit transparent packet forwarding & inspection)
+module "nva_sg" {
+  source = "./modules/security-groups"
+  vpc_id = module.inspection_vpc.vpc_id
+  name   = "nva-appliance-sg"
+  ingress_rules = [
+    {
+      description     = "Allow all routed traffic for Suricata deep packet inspection"
+      from_port       = 0
+      to_port         = 0
+      protocol        = "-1"
+      cidr_blocks     = ["0.0.0.0/0"]
+      security_groups = []
+    }
+  ]
+  egress_rules = [
+    {
+      description = "Allow all outbound forwarded traffic from NVA"
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+  tags = {
+    Name        = "nva-appliance-sg"
+    Environment = "Security-Core"
+  }
+}
+
+# Dedicated ENI for Suricata NVA Appliance with source/dest check disabled
+resource "aws_network_interface" "nva" {
+  subnet_id         = module.inspection_vpc.private_subnets[0]
+  source_dest_check = false
+  security_groups   = [module.nva_sg.id]
+  description       = "Primary ENI for Suricata NVA Inspection Appliance"
+
+  tags = {
+    Name = "nva-inspection-eni"
+  }
+}
+
+# Suricata Open-Source Network Virtual Appliance (NVA) EC2 Instance
+resource "aws_instance" "nva" {
+  ami                  = data.aws_ami.ubuntu.id
+  instance_type        = var.nva_instance_type
+  key_name             = data.aws_key_pair.key_pair.key_name
+  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
+
+  network_interface {
+    network_interface_id = aws_network_interface.nva.id
+    device_index         = 0
+  }
+
+  user_data_base64     = filebase64("${path.module}/scripts/nva_user_data.sh")
+
+  tags = {
+    Name        = "suricata-nva"
+    Role        = "Network-Virtual-Appliance"
+    Environment = "Security-Core"
   }
 }
 
@@ -197,35 +293,78 @@ module "egress_vpc" {
 module "transit_gateway" {
   source      = "./modules/transit-gateway"
   name        = "transit-gateway"
-  description = "Transit Gateway with Centralized NAT"
+  description = "Transit Gateway with Centralized NAT and Suricata NVA Inspection"
 
+  # Dedicated /28 Subnets for Spoke Attachments
   spoke_attachments = [
     {
       vpc_id     = module.vpc1.vpc_id
-      subnet_ids = module.vpc1.private_subnets
+      subnet_ids = module.vpc1.intra_subnets
       name       = "vpc1-attachment"
     },
     {
       vpc_id     = module.vpc2.vpc_id
-      subnet_ids = module.vpc2.private_subnets
+      subnet_ids = module.vpc2.intra_subnets
       name       = "vpc2-attachment"
     },
     {
       vpc_id     = module.vpc3.vpc_id
-      subnet_ids = module.vpc3.private_subnets
+      subnet_ids = module.vpc3.intra_subnets
       name       = "vpc3-attachment"
     }
   ]
 
+  # Egress VPC Attachment (Appliance Mode Enabled)
   egress_attachment = {
     vpc_id     = module.egress_vpc.vpc_id
     subnet_ids = module.egress_vpc.private_subnets
     name       = "egress-attachment"
   }
+
+  # Central Inspection VPC Attachment (Appliance Mode Enabled)
+  inspection_attachment = {
+    vpc_id     = module.inspection_vpc.vpc_id
+    subnet_ids = module.inspection_vpc.intra_subnets
+    name       = "inspection-attachment"
+  }
 }
 
 # ----------------------------------------------------------------------
-# Route Table Routes
+# Inspection VPC Routing
+# ----------------------------------------------------------------------
+
+# Route packets entering Inspection VPC via TGW intra subnets to the Suricata NVA ENI
+resource "aws_route" "inspection_tgw_to_nva_default" {
+  route_table_id         = module.inspection_vpc.intra_route_table_ids[0]
+  destination_cidr_block = "0.0.0.0/0"
+  network_interface_id   = aws_network_interface.nva.id
+}
+
+resource "aws_route" "inspection_tgw_to_nva_rfc1918" {
+  route_table_id         = module.inspection_vpc.intra_route_table_ids[0]
+  destination_cidr_block = "10.0.0.0/8"
+  network_interface_id   = aws_network_interface.nva.id
+}
+
+# Route packets forwarded by Suricata NVA back into Transit Gateway
+resource "aws_route" "inspection_nva_to_tgw_default" {
+  count                  = length(var.inspection_appliance_subnets)
+  route_table_id         = module.inspection_vpc.private_route_table_ids[count.index]
+  destination_cidr_block = "0.0.0.0/0"
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway]
+}
+
+resource "aws_route" "inspection_nva_to_tgw_rfc1918" {
+  count                  = length(var.inspection_appliance_subnets)
+  route_table_id         = module.inspection_vpc.private_route_table_ids[count.index]
+  destination_cidr_block = "10.0.0.0/8"
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway]
+}
+
+# ----------------------------------------------------------------------
+# Spoke & Egress VPC Routes
 # ----------------------------------------------------------------------
 
 # Default route 0.0.0.0/0 from Spoke Private Subnets to Transit Gateway
@@ -362,13 +501,12 @@ module "instance1" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   associate_public_ip_address = false
-  #availability_zone           = var.azs[0].id
-  key_name             = data.aws_key_pair.key_pair.key_name
-  subnet_id            = module.vpc1.private_subnets[0]
-  security_groups      = [module.vpc1_sg.id]
-  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
-  user_data            = filebase64("${path.module}/scripts/user_data.sh")
-  name                 = "instance1"
+  key_name                    = data.aws_key_pair.key_pair.key_name
+  subnet_id                   = module.vpc1.private_subnets[0]
+  security_groups             = [module.vpc1_sg.id]
+  iam_instance_profile        = aws_iam_instance_profile.ssm_profile.name
+  user_data                   = filebase64("${path.module}/scripts/user_data.sh")
+  name                        = "instance1"
 }
 
 module "instance2" {
@@ -377,12 +515,11 @@ module "instance2" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = "t2.micro"
   associate_public_ip_address = false
-  #availability_zone           = var.azs[0].id
-  key_name             = data.aws_key_pair.key_pair.key_name
-  subnet_id            = module.vpc2.private_subnets[0]
-  security_groups      = [module.vpc2_sg.id]
-  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
-  user_data            = filebase64("${path.module}/scripts/user_data.sh")
+  key_name                    = data.aws_key_pair.key_pair.key_name
+  subnet_id                   = module.vpc2.private_subnets[0]
+  security_groups             = [module.vpc2_sg.id]
+  iam_instance_profile        = aws_iam_instance_profile.ssm_profile.name
+  user_data                   = filebase64("${path.module}/scripts/user_data.sh")
 }
 
 module "instance3" {
@@ -397,3 +534,27 @@ module "instance3" {
   iam_instance_profile        = aws_iam_instance_profile.ssm_profile.name
   user_data                   = filebase64("${path.module}/scripts/user_data.sh")
 }
+
+# ----------------------------------------------------------------------
+# Point 4: AWS RAM Sharing for Multi-Account Deployment
+# ----------------------------------------------------------------------
+# resource "aws_ram_resource_share" "tgw_share" {
+#   name                      = "central-tgw-share"
+#   allow_external_principals = false
+
+#   tags = {
+#     Name        = "central-tgw-share"
+#     Environment = "Production"
+#   }
+# }
+
+# resource "aws_ram_resource_association" "tgw_assoc" {
+#   resource_arn       = module.transit_gateway.transit_gateway_arn
+#   resource_share_arn = aws_ram_resource_share.tgw_share.arn
+# }
+
+# resource "aws_ram_principal_association" "tgw_principals" {
+#   count              = length(var.ram_principals)
+#   principal          = var.ram_principals[count.index]
+#   resource_share_arn = aws_ram_resource_share.tgw_share.arn
+# }

@@ -20,6 +20,12 @@ variable "private_subnets" {
   default = []
 }
 
+variable "intra_subnets" {
+  type        = list(string)
+  default     = []
+  description = "Dedicated subnets with no internet/NAT routes (ideal for TGW attachments)"
+}
+
 variable "database_subnets" {
   type    = list(string)
   default = []

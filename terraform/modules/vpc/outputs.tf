@@ -26,3 +26,12 @@ output "natgw_ids" {
   value = module.vpc.natgw_ids
 }
 
+output "intra_subnets" {
+  value = module.vpc.intra_subnets
+}
+
+output "intra_route_table_ids" {
+  value = module.vpc.intra_route_table_ids
+}
+
+
