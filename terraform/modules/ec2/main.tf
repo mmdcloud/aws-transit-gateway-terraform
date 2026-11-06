@@ -7,7 +7,13 @@ resource "aws_instance" "instance" {
   vpc_security_group_ids      = var.security_groups
   iam_instance_profile        = var.iam_instance_profile
   user_data                   = var.user_data
-  tags = {
-    Name = var.name
-  }
+  user_data_base64            = var.user_data_base64
+  source_dest_check           = var.source_dest_check
+
+  tags = merge(
+    {
+      Name = var.name
+    },
+    var.tags
+  )
 }

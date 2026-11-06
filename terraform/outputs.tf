@@ -12,12 +12,12 @@ output "instance3_private_ip" {
 
 output "nva_instance_id" {
   description = "EC2 Instance ID of the Suricata NVA Appliance"
-  value       = aws_instance.nva.id
+  value       = module.nva.id
 }
 
 output "nva_private_ip" {
   description = "Private IP of the Suricata NVA Appliance ENI"
-  value       = aws_network_interface.nva.private_ip
+  value       = module.nva.private_ip
 }
 
 output "inspection_vpc_id" {

@@ -129,7 +129,6 @@ resource "aws_ec2_transit_gateway_route_table_propagation" "spoke_to_egress" {
 # ----------------------------------------------------------------------
 # Transit Gateway Routes
 # ----------------------------------------------------------------------
-
 # 1. Spoke Route Table Routes:
 # When inspection is active: Route 0.0.0.0/0 to Inspection VPC Attachment
 resource "aws_ec2_transit_gateway_route" "spoke_default_to_inspection" {

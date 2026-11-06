@@ -189,11 +189,11 @@ module "egress_vpc" {
   enable_dns_support      = true
   create_igw              = true
   map_public_ip_on_launch = true
-  
+
   # Multi-AZ High Availability NAT Gateways (1 per AZ)
-  enable_nat_gateway      = true
-  single_nat_gateway      = false
-  one_nat_gateway_per_az  = true
+  enable_nat_gateway     = true
+  single_nat_gateway     = false
+  one_nat_gateway_per_az = true
 
   tags = {
     Name        = "egress-vpc"
@@ -205,18 +205,18 @@ module "egress_vpc" {
 # Centralized Inspection VPC (Suricata NVA IDS/IPS)
 # ----------------------------------------------------------------------
 module "inspection_vpc" {
-  source                  = "./modules/vpc"
-  vpc_name                = "inspection-vpc"
-  vpc_cidr                = "10.200.0.0/16"
-  azs                     = var.azs
-  private_subnets         = var.inspection_appliance_subnets
-  intra_subnets           = var.inspection_tgw_subnets
-  enable_dns_hostnames    = true
-  enable_dns_support      = true
-  create_igw              = false
-  enable_nat_gateway      = false
-  single_nat_gateway      = false
-  one_nat_gateway_per_az  = false
+  source                 = "./modules/vpc"
+  vpc_name               = "inspection-vpc"
+  vpc_cidr               = "10.200.0.0/16"
+  azs                    = var.azs
+  private_subnets        = var.inspection_appliance_subnets
+  intra_subnets          = var.inspection_tgw_subnets
+  enable_dns_hostnames   = true
+  enable_dns_support     = true
+  create_igw             = false
+  enable_nat_gateway     = false
+  single_nat_gateway     = false
+  one_nat_gateway_per_az = false
 
   tags = {
     Name        = "inspection-vpc"
@@ -254,34 +254,21 @@ module "nva_sg" {
   }
 }
 
-# Dedicated ENI for Suricata NVA Appliance with source/dest check disabled
-resource "aws_network_interface" "nva" {
-  subnet_id         = module.inspection_vpc.private_subnets[0]
-  source_dest_check = false
-  security_groups   = [module.nva_sg.id]
-  description       = "Primary ENI for Suricata NVA Inspection Appliance"
+# Suricata Open-Source Network Virtual Appliance (NVA) EC2 Instance Module
+module "nva" {
+  source                      = "./modules/ec2"
+  name                        = "suricata-nva"
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = var.nva_instance_type
+  associate_public_ip_address = false
+  key_name                    = data.aws_key_pair.key_pair.key_name
+  subnet_id                   = module.inspection_vpc.private_subnets[0]
+  security_groups             = [module.nva_sg.id]
+  iam_instance_profile        = aws_iam_instance_profile.ssm_profile.name
+  user_data_base64            = filebase64("${path.module}/scripts/nva_user_data.sh")
+  source_dest_check           = false
 
   tags = {
-    Name = "nva-inspection-eni"
-  }
-}
-
-# Suricata Open-Source Network Virtual Appliance (NVA) EC2 Instance
-resource "aws_instance" "nva" {
-  ami                  = data.aws_ami.ubuntu.id
-  instance_type        = var.nva_instance_type
-  key_name             = data.aws_key_pair.key_pair.key_name
-  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
-
-  network_interface {
-    network_interface_id = aws_network_interface.nva.id
-    device_index         = 0
-  }
-
-  user_data_base64     = filebase64("${path.module}/scripts/nva_user_data.sh")
-
-  tags = {
-    Name        = "suricata-nva"
     Role        = "Network-Virtual-Appliance"
     Environment = "Security-Core"
   }
@@ -337,13 +324,13 @@ module "transit_gateway" {
 resource "aws_route" "inspection_tgw_to_nva_default" {
   route_table_id         = module.inspection_vpc.intra_route_table_ids[0]
   destination_cidr_block = "0.0.0.0/0"
-  network_interface_id   = aws_network_interface.nva.id
+  network_interface_id   = module.nva.primary_network_interface_id
 }
 
 resource "aws_route" "inspection_tgw_to_nva_rfc1918" {
   route_table_id         = module.inspection_vpc.intra_route_table_ids[0]
   destination_cidr_block = "10.0.0.0/8"
-  network_interface_id   = aws_network_interface.nva.id
+  network_interface_id   = module.nva.primary_network_interface_id
 }
 
 # Route packets forwarded by Suricata NVA back into Transit Gateway
