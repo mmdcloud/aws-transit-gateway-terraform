@@ -1,6 +1,6 @@
-# AWS Enterprise Multi-VPC Network with Transit Gateway, Centralized Egress & Open-Source Suricata NVA Inspection
+# AWS Multi-VPC Network with Transit Gateway, Centralized Egress & Open-Source Suricata NVA Inspection
 
-This repository provides a production-grade Terraform configuration deploying an enterprise Hub-and-Spoke network architecture in AWS using **AWS Transit Gateway (TGW)**, a **Centralized Egress VPC** with Multi-AZ NAT Gateways, and a **Centralized Inspection VPC** powered by an open-source **Suricata Network Virtual Appliance (NVA)** for deep packet inspection (IDS/IPS).
+This repository provides a production-grade Terraform configuration deploying an Hub-and-Spoke network architecture in AWS using **AWS Transit Gateway (TGW)**, a **Centralized Egress VPC** with Multi-AZ NAT Gateways, and a **Centralized Inspection VPC** powered by an open-source **Suricata Network Virtual Appliance (NVA)** for deep packet inspection (IDS/IPS).
 
 ---
 
