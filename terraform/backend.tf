@@ -12,9 +12,9 @@
 
 # terraform {
 #   backend "s3" {
-#     bucket         = "terraform-state-tgw-hub-344626620590-ap-south-1"
+#     bucket         = "terraform-state-tgw-hub-344626620590-us-east-1"
 #     key            = "networking/tgw-hub/terraform.tfstate"
-#     region         = "ap-south-1"
+#     region         = "us-east-1"
 #     dynamodb_table = "terraform-lock-table"
 #     encrypt        = true
 #   }

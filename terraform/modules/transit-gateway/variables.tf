@@ -9,6 +9,12 @@ variable "description" {
   description = "Description for the Transit Gateway"
 }
 
+variable "amazon_side_asn" {
+  type        = number
+  default     = 64512
+  description = "Private Autonomous System Number (ASN) for the Amazon side of the Transit Gateway"
+}
+
 variable "spoke_attachments" {
   type = list(object({
     vpc_id     = string

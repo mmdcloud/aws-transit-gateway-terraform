@@ -277,10 +277,13 @@ module "nva" {
 # ----------------------------------------------------------------------
 # Transit Gateway Configuration
 # ----------------------------------------------------------------------
+data "aws_caller_identity" "current" {}
+
 module "transit_gateway" {
-  source      = "./modules/transit-gateway"
-  name        = "transit-gateway"
-  description = "Transit Gateway with Centralized NAT and Suricata NVA Inspection"
+  source          = "./modules/transit-gateway"
+  name            = "transit-gateway"
+  description     = "Transit Gateway with Centralized NAT and Suricata NVA Inspection"
+  amazon_side_asn = var.primary_tgw_asn
 
   # Dedicated /28 Subnets for Spoke Attachments
   spoke_attachments = [
@@ -314,6 +317,93 @@ module "transit_gateway" {
     subnet_ids = module.inspection_vpc.intra_subnets
     name       = "inspection-attachment"
   }
+}
+
+# ----------------------------------------------------------------------
+# Peer Region Infrastructure & Inter-Region TGW Peering
+# ----------------------------------------------------------------------
+module "peer_vpc" {
+  source                  = "./modules/vpc"
+  providers               = { aws = aws.peer }
+  vpc_name                = "vpc4-peer"
+  vpc_cidr                = var.peer_vpc_cidr
+  azs                     = var.peer_azs
+  public_subnets          = var.peer_vpc_public_subnets
+  private_subnets         = var.peer_vpc_private_subnets
+  intra_subnets           = var.peer_vpc_tgw_subnets
+  enable_dns_hostnames    = true
+  enable_dns_support      = true
+  create_igw              = true
+  map_public_ip_on_launch = true
+  enable_nat_gateway      = false
+  single_nat_gateway      = false
+  one_nat_gateway_per_az  = false
+  tags = {
+    Name        = "vpc4-peer"
+    Environment = "DR-Peer-Region"
+  }
+}
+
+module "peer_vpc_sg" {
+  source    = "./modules/security-groups"
+  providers = { aws = aws.peer }
+  vpc_id    = module.peer_vpc.vpc_id
+  name      = "vpc4-peer-sg"
+  ingress_rules = [
+    {
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      cidr_blocks     = ["10.0.0.0/8"]
+      security_groups = []
+      description     = "HTTP from primary and peer spoke subnets"
+    },
+    {
+      from_port       = -1
+      to_port         = -1
+      protocol        = "icmp"
+      cidr_blocks     = ["10.0.0.0/8"]
+      security_groups = []
+      description     = "ICMP ping from primary and peer spoke subnets"
+    }
+  ]
+  egress_rules = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Allow all outbound traffic"
+    }
+  ]
+}
+
+module "transit_gateway_peering" {
+  source = "./modules/transit-gateway-peering"
+  providers = {
+    aws      = aws
+    aws.peer = aws.peer
+  }
+
+  name                                   = "tgw"
+  primary_transit_gateway_id             = module.transit_gateway.transit_gateway_id
+  primary_post_inspection_route_table_id = module.transit_gateway.post_inspection_route_table_id
+  primary_inspection_attachment_id       = module.transit_gateway.inspection_attachment_id
+  primary_spoke_cidrs                    = ["10.1.0.0/16", "10.2.0.0/16", "10.3.0.0/16"]
+  primary_blackhole_cidrs                = ["10.100.0.0/16", "10.200.0.0/16"]
+
+  peer_region     = var.peer_region
+  peer_account_id = data.aws_caller_identity.current.account_id
+  peer_tgw_asn    = var.peer_tgw_asn
+  peer_spoke_attachments = [
+    {
+      vpc_id     = module.peer_vpc.vpc_id
+      subnet_ids = module.peer_vpc.intra_subnets
+      name       = "vpc4-peer-attachment"
+    }
+  ]
+  peer_vpc_cidrs          = [var.peer_vpc_cidr]
+  peer_centralized_egress = var.peer_centralized_egress
 }
 
 # ----------------------------------------------------------------------
@@ -422,6 +512,64 @@ resource "aws_route" "vpc3_to_vpc2" {
   depends_on             = [module.transit_gateway]
 }
 
+# Cross-Region Inter-VPC routes from Primary Spoke Public Subnets to Peer Region VPC
+resource "aws_route" "vpc1_to_peer_vpc" {
+  route_table_id         = module.vpc1.public_route_table_ids[0]
+  destination_cidr_block = var.peer_vpc_cidr
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway_peering]
+}
+
+resource "aws_route" "vpc2_to_peer_vpc" {
+  route_table_id         = module.vpc2.public_route_table_ids[0]
+  destination_cidr_block = var.peer_vpc_cidr
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway_peering]
+}
+
+resource "aws_route" "vpc3_to_peer_vpc" {
+  route_table_id         = module.vpc3.public_route_table_ids[0]
+  destination_cidr_block = var.peer_vpc_cidr
+  transit_gateway_id     = module.transit_gateway.transit_gateway_id
+  depends_on             = [module.transit_gateway_peering]
+}
+
+# ----------------------------------------------------------------------
+# Peer Region VPC Routes
+# ----------------------------------------------------------------------
+resource "aws_route" "peer_vpc_private_default" {
+  provider               = aws.peer
+  count                  = length(var.peer_vpc_private_subnets)
+  route_table_id         = module.peer_vpc.private_route_table_ids[count.index]
+  destination_cidr_block = "0.0.0.0/0"
+  transit_gateway_id     = module.transit_gateway_peering.peer_transit_gateway_id
+  depends_on             = [module.transit_gateway_peering]
+}
+
+resource "aws_route" "peer_vpc_to_vpc1" {
+  provider               = aws.peer
+  route_table_id         = module.peer_vpc.public_route_table_ids[0]
+  destination_cidr_block = "10.1.0.0/16"
+  transit_gateway_id     = module.transit_gateway_peering.peer_transit_gateway_id
+  depends_on             = [module.transit_gateway_peering]
+}
+
+resource "aws_route" "peer_vpc_to_vpc2" {
+  provider               = aws.peer
+  route_table_id         = module.peer_vpc.public_route_table_ids[0]
+  destination_cidr_block = "10.2.0.0/16"
+  transit_gateway_id     = module.transit_gateway_peering.peer_transit_gateway_id
+  depends_on             = [module.transit_gateway_peering]
+}
+
+resource "aws_route" "peer_vpc_to_vpc3" {
+  provider               = aws.peer
+  route_table_id         = module.peer_vpc.public_route_table_ids[0]
+  destination_cidr_block = "10.3.0.0/16"
+  transit_gateway_id     = module.transit_gateway_peering.peer_transit_gateway_id
+  depends_on             = [module.transit_gateway_peering]
+}
+
 # Return route in Egress VPC Public Subnet to route spoke traffic back into Transit Gateway
 resource "aws_route" "egress_public_return_to_tgw" {
   route_table_id         = module.egress_vpc.public_route_table_ids[0]
@@ -434,6 +582,23 @@ resource "aws_route" "egress_public_return_to_tgw" {
 # Test Instances
 # ----------------------------------------------------------------------
 data "aws_ami" "ubuntu" {
+  most_recent = true
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  owners = ["099720109477"]
+}
+
+data "aws_ami" "ubuntu_peer" {
+  provider    = aws.peer
   most_recent = true
 
   filter {
@@ -520,6 +685,33 @@ module "instance3" {
   security_groups             = [module.vpc3_sg.id]
   iam_instance_profile        = aws_iam_instance_profile.ssm_profile.name
   user_data                   = filebase64("${path.module}/scripts/user_data.sh")
+}
+
+module "peer_instance" {
+  source                      = "./modules/ec2"
+  providers                   = { aws = aws.peer }
+  name                        = "instance4-peer"
+  ami                         = data.aws_ami.ubuntu_peer.id
+  instance_type               = "t3.micro"
+  associate_public_ip_address = false
+  subnet_id                   = module.peer_vpc.private_subnets[0]
+  security_groups             = [module.peer_vpc_sg.id]
+  iam_instance_profile        = aws_iam_instance_profile.ssm_profile.name
+  user_data_base64            = filebase64("${path.module}/scripts/user_data.sh")
+
+  tags = {
+    Region      = var.peer_region
+    Environment = "DR-Peer-Region"
+  }
+
+  depends_on = [
+    module.nva,
+    module.transit_gateway_peering,
+    aws_route.peer_vpc_private_default,
+    aws_route.inspection_tgw_to_nva_default,
+    aws_route.inspection_nva_to_tgw_default,
+    aws_route.egress_public_return_to_tgw
+  ]
 }
 
 # ----------------------------------------------------------------------

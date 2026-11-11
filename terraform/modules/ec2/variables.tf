@@ -21,7 +21,8 @@ variable "associate_public_ip_address" {
 
 variable "key_name" {
   type        = string
-  description = "Key pair name"
+  default     = null
+  description = "Key pair name (optional when using AWS SSM Session Manager)"
 }
 
 variable "subnet_id" {
